@@ -1,7 +1,27 @@
 package main
 
-func RunPipeline(cmds ...cmd) {
+import "sync"
 
+func RunPipeline(cmds ...cmd) {
+	wg := &sync.WaitGroup{}
+	in := make(chan interface{})
+	close(in)
+
+
+	for _, job := range(cmds) {
+		out := make(chan interface{})
+		wg.Add(1)
+		go func(in, out chan interface{}, job cmd) {
+			defer wg.Done()
+			defer close(out)
+
+			job(in, out)
+		}(in, out, job)
+
+		in = out
+	}
+
+	wg.Wait()
 }
 
 func SelectUsers(in, out chan interface{}) {

@@ -25,8 +25,33 @@ func RunPipeline(cmds ...cmd) {
 }
 
 func SelectUsers(in, out chan interface{}) {
-	// 	in - string
-	// 	out - User
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	seen := make(map[uint64]struct{})
+
+	for row := range in {
+		email := row.(string)
+
+		wg.Add(1)
+		go func(email string) {
+			defer wg.Done()
+
+			user := GetUser(email)
+
+			mu.Lock()
+			_, isSeen := seen[user.ID]
+			if !isSeen {
+				seen[user.ID] = struct{}{}
+			}
+			mu.Unlock()
+
+			if !isSeen {
+				out <- user
+			}
+		}(email)
+	}
+
+	wg.Wait()
 }
 
 func SelectMessages(in, out chan interface{}) {

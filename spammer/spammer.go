@@ -7,8 +7,7 @@ func RunPipeline(cmds ...cmd) {
 	in := make(chan interface{})
 	close(in)
 
-
-	for _, job := range(cmds) {
+	for _, job := range cmds {
 		out := make(chan interface{})
 		wg.Add(1)
 		go func(in, out chan interface{}, job cmd) {
@@ -55,8 +54,47 @@ func SelectUsers(in, out chan interface{}) {
 }
 
 func SelectMessages(in, out chan interface{}) {
-	// 	in - User
-	// 	out - MsgID
+	var wg sync.WaitGroup
+
+	var batch []User
+
+	for user := range in {
+		batch = append(batch, user.(User))
+
+		if len(batch) == 2 {
+			batchCopy := append([]User(nil), batch...)
+			wg.Add(1)
+			go func(batch []User) {
+				defer wg.Done()
+
+				msgs, _ := GetMessages(batch...)
+
+				for _, msg := range msgs {
+					out <- msg
+				}
+
+			}(batchCopy)
+
+			batch = batch[:0]
+		}
+	}
+
+	if len(batch) != 0 {
+		batchCopy := append([]User(nil), batch...)
+		wg.Add(1)
+		go func(batch []User) {
+			defer wg.Done()
+
+			msgs, _ := GetMessages(batch...)
+
+			for _, msg := range msgs {
+				out <- msg
+			}
+
+		}(batchCopy)
+	}
+
+	wg.Wait()
 }
 
 func CheckSpam(in, out chan interface{}) {

@@ -1,6 +1,10 @@
 package main
 
-import "sync"
+import (
+	"fmt"
+	"sort"
+	"sync"
+)
 
 func RunPipeline(cmds ...cmd) {
 	wg := &sync.WaitGroup{}
@@ -122,6 +126,20 @@ func CheckSpam(in, out chan interface{}) {
 }
 
 func CombineResults(in, out chan interface{}) {
-	// in - MsgData
-	// out - string
+	var results []MsgData
+
+	for raw := range in {
+		results = append(results, raw.(MsgData))
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].HasSpam != results[j].HasSpam {
+			return results[i].HasSpam
+		}
+		return results[i].ID < results[j].ID
+	})
+
+	for _, result := range results {
+		out <- fmt.Sprintf("%t %d", result.HasSpam, result.ID)
+	}
 }

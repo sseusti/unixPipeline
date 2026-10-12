@@ -98,8 +98,27 @@ func SelectMessages(in, out chan interface{}) {
 }
 
 func CheckSpam(in, out chan interface{}) {
-	// in - MsgID
-	// out - MsgData
+	var wg sync.WaitGroup
+	const quotaLim = 5
+	quotaCh := make(chan struct{}, quotaLim)
+
+	for msg := range in {
+		msgId := msg.(MsgID)
+
+		quotaCh <- struct{}{}
+		wg.Add(1)
+
+		go func(msgId MsgID) {
+			defer wg.Done()
+			defer func() {<- quotaCh}()
+
+			ok, _ := HasSpam(msgId)
+
+			out <- MsgData{msgId, ok}
+		}(msgId)
+	}
+
+	wg.Wait()
 }
 
 func CombineResults(in, out chan interface{}) {
